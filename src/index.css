@@ -1,0 +1,68 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+/*
+  PadelDNA design tokens.
+
+  Palette is built from the actual world of competitive padel: night
+  matches under floodlights, the saturated blue turf of a modern padel
+  court, and the chartreuse of the ball as a single struck accent.
+  Everything else stays quiet — ink, slate, hairline borders.
+*/
+@theme {
+  --font-display: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink-950: #0b0f16;
+  --color-ink-900: #0e1420;
+  --color-ink-800: #141c2b;
+  --color-ink-700: #1b2536;
+  --color-ink-600: #2a3547;
+  --color-ink-500: #465067;
+
+  --color-mist-400: #6b7688;
+  --color-mist-300: #8b96a5;
+  --color-mist-100: #d6dbe3;
+  --color-paper: #f1f0ea;
+
+  --color-court-700: #0f5c78;
+  --color-court-600: #146e8f;
+  --color-court-500: #1d8fb0;
+  --color-court-400: #3fb1cf;
+
+  --color-ball-500: #c4d82e;
+  --color-ball-400: #d7e85a;
+
+  --color-clay-500: #d97757;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-ink-900);
+  color: var(--color-paper);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Visible keyboard focus everywhere, styled to match the palette rather
+   than suppressed. */
+:focus-visible {
+  outline: 2px solid var(--color-court-400);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
