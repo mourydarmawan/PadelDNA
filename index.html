@@ -467,5 +467,511 @@ function viewAuth() {
   return el;
 }
 </script>
+<script>
+// ============================================================
+// DASHBOARD — Player view
+// ============================================================
+
+const CATEGORIES = [
+  { key: 'power',    label: 'Power',    color: '#FF6B4A' },
+  { key: 'control',  label: 'Control',  color: '#4C8DFF' },
+  { key: 'attack',   label: 'Attack',   color: '#00E28A' },
+  { key: 'defense',  label: 'Defense',  color: '#8B5CF6' },
+  { key: 'mental',   label: 'Mental',   color: '#FFB020' },
+  { key: 'strategy', label: 'Strategy', color: '#06B6D4' },
+];
+
+const SUB_SKILLS = {
+  power:    ['Smash Power', 'Serve Speed', 'Overhead'],
+  control:  ['Placement', 'Consistency', 'Error Rate'],
+  attack:   ['Smash', 'Chiquita', 'Vibora'],
+  defense:  ['Lob', 'Return', 'Block'],
+  mental:   ['Focus', 'Composure', 'Clutch'],
+  strategy: ['Positioning', 'Shot Selection', 'Partnering'],
+};
+
+async function loadLatestAssessment(playerId) {
+  // Latest coach assessment
+  const { data: coachAssess } = await sb
+    .from('assessments')
+    .select('*, category_scores(*), sub_skill_scores(*)')
+    .eq('player_id', playerId)
+    .eq('source', 'coach')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // Latest AI assessment
+  const { data: aiAssess } = await sb
+    .from('assessments')
+    .select('*, category_scores(*), sub_skill_scores(*)')
+    .eq('player_id', playerId)
+    .eq('source', 'ai')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // Latest AI review (narrative)
+  const { data: aiReview } = await sb
+    .from('ai_reviews')
+    .select('*')
+    .eq('player_id', playerId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // Coach comments
+  const { data: comments } = await sb
+    .from('coach_comments')
+    .select('*, coach:coach_id(full_name, avatar_url)')
+    .eq('player_id', playerId)
+    .order('created_at', { ascending: false });
+
+  return { coachAssess, aiAssess, aiReview, comments: comments || [] };
+}
+
+function extractScores(assessment) {
+  const out = { categories: {}, subSkills: {} };
+  if (!assessment) return out;
+  (assessment.category_scores || []).forEach(c => {
+    out.categories[c.category] = Number(c.score);
+  });
+  (assessment.sub_skill_scores || []).forEach(s => {
+    if (!out.subSkills[s.category]) out.subSkills[s.category] = {};
+    out.subSkills[s.category][s.skill] = Number(s.score);
+  });
+  return out;
+}
+
+function overallFromCategories(cats) {
+  const vals = Object.values(cats).filter(v => Number.isFinite(v));
+  if (!vals.length) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+// Rating tier from 0-10 → DUPR 1.00-7.00
+function toDUPR(avg10) {
+  if (avg10 == null) return null;
+  // Map 0-10 to 1.00-7.00
+  const v = 1 + (avg10 / 10) * 6;
+  return Math.max(1, Math.min(7, v));
+}
+
+function tierLabel(dupr) {
+  if (dupr == null) return { label: 'Unrated', color: 'var(--pd-tx3)' };
+  if (dupr >= 6.0) return { label: 'Elite', color: '#FFB020' };
+  if (dupr >= 4.5) return { label: 'Advanced', color: '#00E28A' };
+  if (dupr >= 3.0) return { label: 'Intermediate', color: '#4C8DFF' };
+  if (dupr >= 1.5) return { label: 'Developing', color: '#9AA3AE' };
+  return { label: 'Beginner', color: '#6B7280' };
+}
+
+// ===== Player card component =====
+function renderPlayerCard(profile, scores, dupr) {
+  const cats = scores.categories || {};
+  const avg = overallFromCategories(cats);
+  const duprVal = dupr ?? toDUPR(avg);
+  const tier = tierLabel(duprVal);
+  const posLine = [
+    profile.handedness === 'left' ? 'Left-handed' : profile.handedness === 'right' ? 'Right-handed' : null,
+    profile.side ? profile.side[0].toUpperCase() + profile.side.slice(1) + ' side' : null,
+    profile.position ? profile.position[0].toUpperCase() + profile.position.slice(1) : null
+  ].filter(Boolean).join(' · ') || 'Profile incomplete';
+
+  return `
+  <div class="pcard">
+    <div class="pcard__inner">
+      <div class="pcard__stripe"></div>
+      <div class="pcard__top">
+        <span class="pcard__id mono">PDNA-${(profile.id || '').slice(0,4).toUpperCase()}</span>
+        ${avg == null
+          ? '<span class="badge badge--n">Not Assessed</span>'
+          : `<span class="badge badge--b"><span class="dot"></span>${tier.label}</span>`}
+      </div>
+      <div class="pcard__identity">
+        <div class="pcard__avatar">
+          ${profile.avatar_url
+            ? `<img src="${esc(profile.avatar_url)}" alt="">`
+            : initials(profile.full_name)}
+        </div>
+        <div style="min-width:0">
+          <div class="pcard__name">${esc(profile.full_name || 'Unnamed Player')}</div>
+          <div class="pcard__meta">${esc(posLine)}</div>
+        </div>
+      </div>
+      <div class="pcard__mini-radar">
+        ${avg == null
+          ? '<div style="color:var(--pd-tx3);font-size:12px;text-align:center">Awaiting first assessment</div>'
+          : renderRadarSVG(cats, 100, 120, true)}
+      </div>
+      <div class="pcard__rating">
+        <span class="pcard__rv" style="${duprVal == null ? 'color:var(--pd-tx3)' : ''}">
+          ${duprVal == null ? '—' : duprVal.toFixed(2)}
+        </span>
+        <span class="pcard__rmax">/7.00</span>
+        <span class="pcard__rtier" style="color:${tier.color}">${tier.label}</span>
+      </div>
+      <div class="pcard__footer">
+        <span>PadelDNA</span>
+        <span>DUPR-style</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ===== Radar SVG (parameterized) =====
+function renderRadarSVG(scores, size = 240, maxRadius = 80, compact = false) {
+  const cx = 100, cy = 100, r = maxRadius;
+  const keys = CATEGORIES.map(c => c.key);
+  const labels = compact ? [] : CATEGORIES.map(c => c.label);
+  const angle = (i) => (Math.PI * 2 * i / keys.length) - Math.PI / 2;
+  const pt = (i, val) => {
+    const a = angle(i);
+    const rr = (Math.max(0, Math.min(10, val)) / 10) * r;
+    return [cx + Math.cos(a) * rr, cy + Math.sin(a) * rr];
+  };
+  const grid = [20, 40, 60, 80].filter(x => x <= r).map(rr =>
+    `<circle cx="${cx}" cy="${cy}" r="${rr}" class="radar__grid"/>`).join('');
+  const axes = keys.map((_, i) => {
+    const [x, y] = pt(i, 10);
+    return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" class="radar__axis"/>`;
+  }).join('');
+  const points = keys.map((k, i) => pt(i, scores[k] ?? 0));
+  const poly = points.map(p => p.join(',')).join(' ');
+  const dots = points.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.5" class="radar__point"/>`).join('');
+  const lbls = labels.map((lb, i) => {
+    const a = angle(i);
+    const lx = cx + Math.cos(a) * (r + 22);
+    const ly = cy + Math.sin(a) * (r + 22);
+    let anchor = 'middle';
+    if (Math.cos(a) > 0.3) anchor = 'start';
+    if (Math.cos(a) < -0.3) anchor = 'end';
+    return `<text class="radar__label" x="${lx}" y="${ly + 4}" text-anchor="${anchor}">${lb}</text>`;
+  }).join('');
+  const vb = compact ? '-20 -20 240 240' : '-40 -40 280 280';
+  return `<div class="radar" style="max-width:${size}px">
+    <svg viewBox="${vb}">${grid}${axes}<polygon class="radar__shape" points="${poly}"/>${dots}${lbls}</svg>
+  </div>`;
+}
+
+// ===== Dashboard view =====
+function viewDashboard() {
+  const el = $(`
+  <div>
+    <div id="nav-slot"></div>
+    <div class="shell" id="content">
+      <div class="ai-loading" style="padding:80px">
+        <div class="spinner spinner--lg"></div>
+        <div>Loading your profile…</div>
+      </div>
+    </div>
+  </div>`);
+
+  el.querySelector('#nav-slot').appendChild(viewNavbar());
+  loadDashboard(el.querySelector('#content'));
+  return el;
+}
+
+async function loadDashboard(container) {
+  const profile = state.profile;
+  if (!profile) { navigate('auth'); return; }
+
+  const { coachAssess, aiAssess, aiReview, comments } = await loadLatestAssessment(profile.id);
+  const coachScores = extractScores(coachAssess);
+  const aiScores = extractScores(aiAssess);
+
+  // Prefer AI scores if they exist (AI supersedes coach per spec)
+  const activeScores = Object.keys(aiScores.categories).length ? aiScores : coachScores;
+  const activeAssess = Object.keys(aiScores.categories).length ? aiAssess : coachAssess;
+
+  const avg = overallFromCategories(activeScores.categories);
+  const dupr = activeAssess?.reclub_rating ? Number(activeAssess.reclub_rating) : toDUPR(avg);
+
+  container.innerHTML = '';
+  container.appendChild(renderDashboardBody(profile, activeScores, dupr, aiReview, comments, !!coachAssess, !!aiAssess));
+}
+
+function renderDashboardBody(profile, scores, dupr, aiReview, comments, hasCoach, hasAI) {
+  const wrap = $(`<div class="stack" style="gap:32px"></div>`);
+
+  // Header
+  wrap.appendChild($(`
+    <div class="row" style="justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px">
+      <div>
+        <div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--pd-tx3);font-weight:600">Player Dashboard</div>
+        <h1 style="font-size:32px;font-weight:800;letter-spacing:-0.03em;margin-top:6px">
+          Welcome back${profile.full_name ? ', ' + esc(profile.full_name.split(' ')[0]) : ''}
+        </h1>
+      </div>
+      <div class="row" style="gap:8px">
+        ${hasCoach ? '<span class="badge badge--ok"><span class="dot"></span>Coach Assessed</span>' : ''}
+        ${hasAI ? '<span class="badge badge--i"><span class="dot"></span>AI Assessed</span>' : ''}
+        ${!hasCoach && !hasAI ? '<span class="badge badge--w">Awaiting First Assessment</span>' : ''}
+      </div>
+    </div>
+  `));
+
+  // ----- Row 1: Player card -----
+  const row1 = $(`<div class="grid grid-2" style="align-items:start"></div>`);
+  row1.appendChild($(`<div>${renderPlayerCard(profile, scores, dupr)}</div>`));
+
+  // Right side: Rating summary
+  const catList = CATEGORIES.map(c => {
+    const v = scores.categories[c.key];
+    return `
+      <div class="row" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--pd-bd)">
+        <span style="font-size:13px;color:var(--pd-tx2)">${c.label}</span>
+        <span class="mono" style="font-weight:600">${v == null ? '—' : Number(v).toFixed(1)}</span>
+      </div>`;
+  }).join('');
+
+  row1.appendChild($(`
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card__title">Rating Breakdown</div>
+          <div class="card__sub">Six core categories · 0–10 scale</div>
+        </div>
+        <div style="text-align:right">
+          <div class="mono" style="font-size:32px;font-weight:700;line-height:1">${dupr == null ? '—' : dupr.toFixed(2)}</div>
+          <div style="font-size:11px;color:var(--pd-tx3);letter-spacing:0.1em;text-transform:uppercase">DUPR / 7.00</div>
+        </div>
+      </div>
+      ${catList}
+    </div>
+  `));
+  wrap.appendChild(row1);
+
+  // ----- Row 2: Technical DNA -----
+  const row2 = $(`<div class="card"></div>`);
+  row2.innerHTML = `
+    <div class="card__head">
+      <div>
+        <div class="card__title">Technical DNA</div>
+        <div class="card__sub">Composite radar across 6 core categories</div>
+      </div>
+      ${Object.keys(scores.categories).length ? '' : '<span class="badge badge--w">No Data</span>'}
+    </div>
+    ${Object.keys(scores.categories).length
+      ? renderRadarSVG(scores.categories, 340, 80, false)
+      : '<div class="empty"><div class="empty__icon">◇</div><div class="empty__title">No DNA profile yet</div><div class="empty__desc">Complete an assessment to generate your radar.</div></div>'}
+  `;
+  wrap.appendChild(row2);
+
+  // ----- Row 3: Attack + Defense breakdown -----
+  const row3 = $(`<div class="grid grid-2"></div>`);
+  ['attack', 'defense'].forEach(catKey => {
+    const cat = CATEGORIES.find(c => c.key === catKey);
+    const skills = SUB_SKILLS[catKey];
+    const subScores = scores.subSkills[catKey] || {};
+    const catScore = scores.categories[catKey];
+
+    const skillsHtml = skills.map(s => {
+      const v = subScores[s];
+      const pct = v == null ? 0 : (v / 10) * 100;
+      return `
+        <div class="skill">
+          <span class="skill__label">${s}</span>
+          <span class="skill__value">${v == null ? '—' : Number(v).toFixed(1)}</span>
+          <div class="meter"><div class="meter__fill" style="width:${pct}%;background:linear-gradient(90deg,${cat.color}55,${cat.color})"></div></div>
+        </div>`;
+    }).join('');
+
+    row3.appendChild($(`
+      <div class="cat">
+        <div class="cat__head">
+          <span class="cat__name" style="color:${cat.color}">${cat.label}</span>
+          <span class="cat__score mono">${catScore == null ? '—' : Number(catScore).toFixed(1)}</span>
+        </div>
+        ${skillsHtml}
+      </div>
+    `));
+  });
+  wrap.appendChild($(`<div><div class="card__title" style="margin-bottom:12px">Skill Breakdown</div></div>`));
+  wrap.appendChild(row3);
+
+  // ----- Row 4: Pro Similarity -----
+  const row4 = $(`<div class="card"></div>`);
+  const simMatches = aiReview?.similarity_json?.matches || [];
+  row4.innerHTML = `
+    <div class="card__head">
+      <div>
+        <div class="card__title">Pro Similarity</div>
+        <div class="card__sub">Your DNA matched against the reference pro database</div>
+      </div>
+      ${simMatches.length ? '<span class="badge badge--i">AI Generated</span>' : ''}
+    </div>
+    ${simMatches.length
+      ? simMatches.map(m => `
+        <div class="prosim" style="margin-bottom:12px">
+          <div class="prosim__avatar">${initials(m.name)}</div>
+          <div class="prosim__meta">
+            <div class="prosim__name">${esc(m.name)}</div>
+            <div class="prosim__style">${esc(m.playstyle || m.position || '')}${m.nationality ? ' · ' + esc(m.nationality) : ''}</div>
+          </div>
+          <div class="prosim__match">${Math.round(m.similarity)}%</div>
+        </div>`).join('')
+      : '<div class="empty"><div class="empty__icon">◈</div><div class="empty__title">No similarity data yet</div><div class="empty__desc">Run an AI review to see which pros you most resemble.</div></div>'}
+  `;
+  wrap.appendChild(row4);
+
+  // ----- Row 5: AI Review + Coach Review tabs -----
+  const row5 = $(`<div></div>`);
+  const tabsEl = $(`
+    <div>
+      <div class="tabs">
+        <div class="tab active" data-tab="ai">AI Review</div>
+        <div class="tab" data-tab="coach">Coach Review</div>
+      </div>
+      <div id="tab-content"></div>
+    </div>`);
+  const tabContent = tabsEl.querySelector('#tab-content');
+
+  function showAITab() {
+    const hasReview = aiReview?.review_text;
+    tabContent.innerHTML = `
+      <div class="card">
+        <div class="card__head">
+          <div>
+            <div class="card__title">AI Performance Review</div>
+            <div class="card__sub">Generated by Gemini based on your DNA</div>
+          </div>
+          <button class="btn btn--primary btn--sm" id="ai-btn">
+            ${hasReview ? 'Re-run AI Review' : 'Generate AI Review'}
+          </button>
+        </div>
+        <div id="ai-body">
+          ${hasReview
+            ? `<div class="reco"><div class="reco__head">◆ AI Assessment</div><div class="reco__body" style="white-space:pre-wrap">${esc(aiReview.review_text)}</div></div>`
+            : '<div class="ai-empty">No AI review yet. Click "Generate AI Review" to analyze your DNA, suggest adjustments, and find your pro match.</div>'}
+        </div>
+      </div>`;
+    tabContent.querySelector('#ai-btn').addEventListener('click', runAIReview);
+  }
+
+  function showCoachTab() {
+    if (!comments.length) {
+      tabContent.innerHTML = `
+        <div class="card">
+          <div class="empty">
+            <div class="empty__icon">👤</div>
+            <div class="empty__title">No coach feedback yet</div>
+            <div class="empty__desc">Your coach's assessment and comments will appear here.</div>
+          </div>
+        </div>`;
+      return;
+    }
+    tabContent.innerHTML = `<div class="stack"></div>`;
+    const stack = tabContent.querySelector('.stack');
+    comments.forEach(c => {
+      const tags = (c.tags || []).map(t => `<span class="badge badge--b">${esc(t)}</span>`).join('');
+      stack.appendChild($(`
+        <div class="ccomment">
+          <div class="ccomment__head">
+            <div class="ccomment__avatar">${initials(c.coach?.full_name || 'Coach')}</div>
+            <div>
+              <div class="ccomment__name">${esc(c.coach?.full_name || 'Coach')}</div>
+              <div class="ccomment__role">Coach · ${new Date(c.created_at).toLocaleDateString()}</div>
+            </div>
+          </div>
+          <div class="ccomment__quote">${esc(c.body)}</div>
+          ${tags ? `<div class="ccomment__tags">${tags}</div>` : ''}
+        </div>
+      `));
+    });
+  }
+
+  tabsEl.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      tabsEl.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      if (t.dataset.tab === 'ai') showAITab(); else showCoachTab();
+    });
+  });
+
+  showAITab();
+  row5.appendChild(tabsEl);
+  wrap.appendChild(row5);
+
+  return wrap;
+}
+
+// ===== AI Review call =====
+async function runAIReview() {
+  const btn = document.querySelector('#ai-btn');
+  const body = document.querySelector('#ai-body');
+  if (!btn || !body) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Running…';
+  body.innerHTML = `
+    <div class="ai-loading">
+      <div class="spinner spinner--lg"></div>
+      <div>Analyzing your DNA against the pro database…</div>
+      <div style="font-size:11px;color:var(--pd-tx3)">This usually takes 5–15 seconds</div>
+    </div>`;
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(FN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ player_id: state.profile.id })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || `AI review failed (${res.status})`);
+    }
+    const result = await res.json();
+    toast('AI review complete');
+    // Reload dashboard
+    await loadDashboard(document.querySelector('#content'));
+  } catch (err) {
+    console.error(err);
+    toast(err.message || 'AI review failed', true);
+    body.innerHTML = `<div class="empty"><div class="empty__icon">×</div><div class="empty__title">AI review failed</div><div class="empty__desc">${esc(err.message)}</div></div>`;
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+  }
+}
+
+// ============================================================
+// PLACEHOLDER — coach dashboard & rate page come in Drop 4
+// ============================================================
+function viewCoachDashboard() {
+  return $(`<div><div class="shell"><div class="empty"><div class="empty__title">Coach dashboard</div><div class="empty__desc">Coming in Drop 4.</div></div></div></div>`);
+}
+function viewRatePlayer() {
+  return $(`<div><div class="shell"><div class="empty"><div class="empty__title">Rate player</div><div class="empty__desc">Coming in Drop 4.</div></div></div></div>`);
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    state.user = session.user;
+    state.profile = await fetchProfile();
+    navigate('dashboard');
+  } else {
+    navigate('auth');
+  }
+  sb.auth.onAuthStateChange((evt) => {
+    if (evt === 'SIGNED_OUT') {
+      state.user = null;
+      state.profile = null;
+      navigate('auth');
+    }
+  });
+}
+
+boot();
+</script>
+
 </body>
 </html>
