@@ -9,13 +9,26 @@ recommendations.
 ## Status
 
 Built in phases; see [PHASES.md](./PHASES.md) for what's live and what's next.
-Currently: **Phase 1 — Architecture, database design, application shell.**
+Currently: **Phase 2 — Authentication, player profile, dashboard, My DNA,
+Trading Card.**
+
+## Demo login
+
+There's no real backend yet. On `/login`, either:
+- Click **"Continue with demo account"** to sign straight in, or
+- Enter any email + a 6+ character password
+
+Both log you into the same seeded player (Moury Darmawan). `/register`
+works the same way — it signs you in with the name you entered, still on
+top of the demo player's DNA/match data. Real, separate accounts arrive
+once Supabase Auth is connected (see below); the swap only touches
+`src/services/authService.ts`, nothing else.
 
 ## Stack
 
 - Vite + React + TypeScript
 - Tailwind CSS v4
-- React Router
+- React Router (with auth-aware route guards)
 - Supabase (Postgres + Auth) — schema defined, not yet connected
 - Recharts (for progress/trend charts, from Phase 5 onward)
 
@@ -26,8 +39,8 @@ npm install
 npm run dev
 ```
 
-The app runs entirely on local seed data until Supabase is connected — no
-backend is required to browse it.
+The app runs entirely on local seed data and local/demo auth until Supabase
+is connected — no backend is required to browse it.
 
 ### Connecting Supabase (optional, for later phases)
 
@@ -41,6 +54,9 @@ backend is required to browse it.
    ```
 4. Restart the dev server. `src/lib/supabase.ts` picks the env vars up
    automatically — no code changes needed.
+5. Auth still needs one more step even then: implement a `SupabaseAuthService`
+   that satisfies the `AuthService` interface in `src/services/authService.ts`
+   and swap the `authService` export. No page or context needs to change.
 
 Never commit a real `.env` file or a service-role key. `.env` is already
 git-ignored.
@@ -49,14 +65,19 @@ git-ignored.
 
 ```
 src/
-  components/   Reusable UI (Button, state views, charts, ...)
+  components/
+    auth/       ProtectedRoute, RedirectIfAuthenticated
+    charts/     DnaRadar (reused by My DNA and the Trading Card)
+    dna/        TradingCard
+    ui/         Button, TextField, Panel, state views
+  context/      AuthContext — session state + the signed-in player's Profile/DNA
   pages/        Route-level page components
-  layouts/      PublicLayout (marketing/auth), AppLayout (authenticated app)
-  features/     Feature-specific logic as it's built (DNA, matches, ...)
-  services/     Data-access layer — talks to Supabase or falls back to seed data
-  lib/          Supabase client, navigation config, shared config
+  layouts/      PublicLayout (marketing), AuthLayout (login/register), AppLayout (authenticated app)
+  data/         demoPlayer.ts — the single seed-data source every page reads from
+  services/     authService.ts (swappable auth), Supabase-backed services land here later
+  lib/          Supabase client, navigation config, DNA scoring math, display labels
   hooks/        Shared React hooks
-  types/        TypeScript types, mirroring supabase/schema.sql
+  types/        TypeScript types — database.ts mirrors supabase/schema.sql, auth.ts is auth-only
   utils/        Pure helper functions
 supabase/
   schema.sql    Full Postgres schema + RLS policies (run manually — see above)
@@ -67,3 +88,4 @@ supabase/
 - `npm run dev` — start the dev server
 - `npm run build` — type-check and build for production
 - `npm run preview` — serve the production build locally
+- `npx oxlint` — lint

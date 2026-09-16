@@ -60,10 +60,10 @@ export function LandingPage() {
               of your game — what you're strong at, what's holding you back, and what to train next.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/signup" className={buttonClasses('primary', 'lg')}>
+              <Link to="/register" className={buttonClasses('primary', 'lg')}>
                 Discover Your PadelDNA
               </Link>
-              <Link to="/app/dashboard" className={buttonClasses('secondary', 'lg')}>
+              <Link to="/dashboard" className={buttonClasses('secondary', 'lg')}>
                 Explore the App
               </Link>
             </div>
@@ -129,7 +129,7 @@ export function LandingPage() {
           honest read of your own game.
         </p>
         <div className="mt-8">
-          <Link to="/signup" className={buttonClasses('primary', 'lg')}>
+          <Link to="/register" className={buttonClasses('primary', 'lg')}>
             Discover Your PadelDNA
           </Link>
         </div>

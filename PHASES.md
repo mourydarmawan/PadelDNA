@@ -8,9 +8,13 @@ pass and a summary before moving on.
       system, full Supabase schema (`supabase/schema.sql`, unconnected),
       TypeScript types, route tree with placeholders for every nav item,
       polished landing page.
-- [ ] **Phase 2 — Authentication, profile, navigation.** Supabase Auth
-      (sign up / log in / log out / persistent session / protected routes),
-      onboarding flow, editable player profile.
+- [x] **Phase 2 — Authentication, profile, navigation.** Local/demo auth
+      behind a swappable `AuthService` interface, protected routes,
+      editable Player Profile, functional Dashboard and My DNA pages, the
+      PadelDNA Trading Card component, full authenticated app shell
+      (sidebar + mobile header/bottom nav + logout). Assessment, Matches,
+      Analysis, Training, Partners, Community remain polished placeholders.
+      Only one demo account exists — see README for details.
 - [ ] **Phase 3 — PadelDNA, assessment, scoring engine.** Skill assessment
       UI (save progress, edit, submit), dynamic DNA scoring module,
       category breakdown, archetype, strengths/weaknesses.

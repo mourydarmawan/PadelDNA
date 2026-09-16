@@ -4,7 +4,14 @@
 
 export type PlayingSide = 'left' | 'right' | 'both';
 export type DominantHand = 'left' | 'right';
-export type PlayerLevel = 'beginner' | 'intermediate' | 'advanced' | 'competitive' | 'professional';
+export type PlayerLevel =
+  | 'beginner'
+  | 'lower_intermediate'
+  | 'intermediate'
+  | 'upper_intermediate'
+  | 'advanced'
+  | 'competitive'
+  | 'professional';
 export type PlayingStyle =
   | 'playmaker'
   | 'tactical_aggressor'
@@ -18,13 +25,18 @@ export type SkillCategory = 'technique' | 'defense' | 'tactics' | 'physical' | '
 export interface Profile {
   id: string;
   fullName: string;
+  username: string | null;
   avatarUrl: string | null;
+  dateOfBirth: string | null;
+  bio: string | null;
   playingSide: PlayingSide | null;
   dominantHand: DominantHand | null;
   currentLevel: PlayerLevel | null;
   yearsPlaying: number | null;
   preferredPosition: PlayingSide | null;
   primaryStyle: PlayingStyle | null;
+  /** Self-reported rating, 1-10. Distinct from the computed PadelDNA score. */
+  currentRating: number | null;
   goals: string | null;
   isPublic: boolean;
   createdAt: string;

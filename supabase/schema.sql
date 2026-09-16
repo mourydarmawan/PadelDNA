@@ -21,11 +21,17 @@ create extension if not exists "pgcrypto";
 create table if not exists profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   full_name text not null,
+  username text unique,
   avatar_url text,
+  date_of_birth date,
+  bio text,
   playing_side text check (playing_side in ('left', 'right', 'both')),
   dominant_hand text check (dominant_hand in ('left', 'right')),
   current_level text check (
-    current_level in ('beginner', 'intermediate', 'advanced', 'competitive', 'professional')
+    current_level in (
+      'beginner', 'lower_intermediate', 'intermediate', 'upper_intermediate',
+      'advanced', 'competitive', 'professional'
+    )
   ),
   years_playing numeric(4, 1),
   preferred_position text check (preferred_position in ('left', 'right', 'both')),
@@ -35,11 +41,18 @@ create table if not exists profiles (
       'power_player', 'defender', 'all_rounder'
     )
   ),
+  -- Self-reported skill rating (not derived from player_dna — this is the
+  -- player's own sense of their level, closer to a matchmaking rating).
+  current_rating numeric(3, 1) check (current_rating between 1 and 10),
   goals text,
   is_public boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Note: email intentionally lives on auth.users (Supabase Auth), not here —
+-- profiles never duplicates auth data. The frontend AuthUser type reflects
+-- this split (see src/types/auth.ts).
 
 -- ----------------------------------------------------------------------------
 -- skill_assessments — one row per submitted (or in-progress) assessment

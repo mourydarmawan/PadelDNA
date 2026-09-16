@@ -13,7 +13,7 @@ export function PublicLayout() {
             <Link to="/login" className={buttonClasses('ghost', 'md')}>
               Log in
             </Link>
-            <Link to="/signup" className={buttonClasses('primary', 'md')}>
+            <Link to="/register" className={buttonClasses('primary', 'md')}>
               Discover Your PadelDNA
             </Link>
           </nav>
