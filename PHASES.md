@@ -15,9 +15,13 @@ pass and a summary before moving on.
       (sidebar + mobile header/bottom nav + logout). Assessment, Matches,
       Analysis, Training, Partners, Community remain polished placeholders.
       Only one demo account exists — see README for details.
-- [ ] **Phase 3 — PadelDNA, assessment, scoring engine.** Skill assessment
-      UI (save progress, edit, submit), dynamic DNA scoring module,
-      category breakdown, archetype, strengths/weaknesses.
+- [x] **Phase 3 — PadelDNA assessment, scoring engine.** 25-question
+      assessment (5 per category, one at a time, progress/back/next/
+      validation), scoring engine (`src/lib/dna.ts`), `playerService`
+      computing a fresh `PlayerDNA` from answers, inline results view
+      reusing the DNA radar and Trading Card. Dashboard/My DNA/Trading
+      Card all update automatically since they read DNA from
+      `AuthContext`, which the assessment now writes to.
 - [ ] **Phase 4 — Match logging, match metrics, match analysis.** Match
       CRUD with optional performance metrics, derived stats (win rate,
       winner/error ratio, efficiency), plain-language interpretation.

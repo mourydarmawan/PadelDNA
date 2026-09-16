@@ -49,9 +49,6 @@ export const demoDNA: PlayerDNA = {
   updatedAt: '2026-09-10T09:00:00.000Z',
 };
 
-export const demoTrainingFocus =
-  'Improve transition positioning and finishing decisions at the net.';
-
 export const demoRecentMatches: Match[] = [
   {
     id: 'demo-match-1',

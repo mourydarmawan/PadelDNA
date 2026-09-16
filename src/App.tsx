@@ -11,6 +11,7 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { DnaPage } from '@/pages/DnaPage';
 import { ProfilePage } from '@/pages/ProfilePage';
+import { AssessmentPage } from '@/pages/AssessmentPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
 function App() {
@@ -50,10 +51,7 @@ function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/dna" element={<DnaPage />} />
             <Route path="/profile" element={<ProfilePage />} />
-            <Route
-              path="/assessment"
-              element={<PlaceholderPage title="Assessment" phase="Phase 3 (Skill Assessment)" />}
-            />
+            <Route path="/assessment" element={<AssessmentPage />} />
             <Route path="/matches" element={<PlaceholderPage title="Matches" phase="Phase 4 (Match Logging)" />} />
             <Route path="/analysis" element={<PlaceholderPage title="Analysis" phase="Phase 4 (Match Analysis)" />} />
             <Route

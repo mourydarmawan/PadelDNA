@@ -3,7 +3,8 @@ import { useAuth } from '@/context/AuthContext';
 import { Panel } from '@/components/ui/Panel';
 import { TradingCard } from '@/components/dna/TradingCard';
 import { buttonClasses } from '@/components/ui/Button';
-import { demoRecentMatches, demoTrainingFocus } from '@/data/demoPlayer';
+import { demoRecentMatches } from '@/data/demoPlayer';
+import { computeTrainingFocus } from '@/lib/dna';
 import { PLAYER_LEVEL_LABELS } from '@/lib/labels';
 import { formatShortDate } from '@/utils/date';
 
@@ -15,6 +16,7 @@ export function DashboardPage() {
   const firstName = profile.fullName.split(' ')[0];
   const primaryStrength = dna.strengths[0];
   const primaryWeakness = dna.weaknesses[0];
+  const trainingFocus = computeTrainingFocus(dna.categoryScores);
 
   return (
     <div className="px-5 sm:px-8 py-8 max-w-6xl mx-auto space-y-6">
@@ -93,7 +95,7 @@ export function DashboardPage() {
           </Panel>
 
           <Panel title="Training focus">
-            <p className="text-[var(--color-mist-100)]">{demoTrainingFocus}</p>
+            <p className="text-[var(--color-mist-100)]">{trainingFocus}</p>
           </Panel>
         </div>
 
